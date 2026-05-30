@@ -8,26 +8,37 @@ import java.util.Locale
 val AllowedCommands = listOf("ls", "dir", "cd", "mkdir", "echo", "clear", "exit")
 val BlockedCommands = listOf("rmdir", "del", "rm")
 
+// ANSI Color Codes
+const val ANSI_RESET = "\u001B[0m"
+const val ANSI_BLACK = "\u001B[30m"
+const val ANSI_RED = "\u001B[31m"
+const val ANSI_GREEN = "\u001B[32m"
+const val ANSI_YELLOW = "\u001B[33m"
+const val ANSI_BLUE = "\u001B[34m"
+const val ANSI_PURPLE = "\u001B[35m"
+const val ANSI_CYAN = "\u001B[36m"
+const val ANSI_WHITE = "\u001B[37m"
+
 fun isWindows(): Boolean {
     return System.getProperty("os.name").lowercase(Locale.getDefault()).contains("win")
 }
 
 fun main(args: Array<String>) = runBlocking {
-    println("=====================================================")
-    println("         CLI Helper powered by Mistral AI            ")
-    println("=====================================================")
+    println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
+    println("${ANSI_CYAN}         CLI Helper powered by Mistral AI            ${ANSI_RESET}")
+    println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
 
     val apiKey = System.getenv("MISTRAL_API_KEY")
     if (apiKey.isNullOrEmpty()) {
-        println("Error: Please set the MISTRAL_API_KEY environment variable.")
-        println("Usage: MISTRAL_API_KEY=your_key ./gradlew run")
+        println("${ANSI_RED}Error: Please set the MISTRAL_API_KEY environment variable.${ANSI_RESET}")
+        println("${ANSI_YELLOW}Usage: MISTRAL_API_KEY=your_key ./gradlew run${ANSI_RESET}")
         return@runBlocking
     }
 
     val model = args.firstOrNull() ?: "mistral-small-latest"
-    println("Using model: $model")
-    println("Type 'exit' or 'quit' to close.")
-    println("=====================================================")
+    println("${ANSI_YELLOW}Using model: $model${ANSI_RESET}")
+    println("${ANSI_YELLOW}Type 'exit' or 'quit' to close.${ANSI_RESET}")
+    println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
 
     val systemPrompt = object {}.javaClass.getResourceAsStream("/system.txt")?.bufferedReader()?.use { it.readText() }
         ?: throw Exception("Could not find system.txt in resources")
@@ -39,10 +50,10 @@ fun main(args: Array<String>) = runBlocking {
     )
 
     while (true) {
-        print("> ")
+        print("${ANSI_GREEN}> ${ANSI_RESET}")
         val rawInput = readlnOrNull()
         if (rawInput == null) {
-            println("\nExiting...")
+            println("\n${ANSI_YELLOW}Exiting...${ANSI_RESET}")
             break
         }
 
@@ -50,8 +61,24 @@ fun main(args: Array<String>) = runBlocking {
         if (input.isEmpty()) continue
 
         if (input.equals("exit", ignoreCase = true) || input.equals("quit", ignoreCase = true)) {
-            println("Exiting...")
+            println("${ANSI_YELLOW}Exiting...${ANSI_RESET}")
             break
+        }
+
+        if (input.equals("help", ignoreCase = true)) {
+            println("${ANSI_CYAN}Commands:${ANSI_RESET}")
+            println("  ${ANSI_CYAN}help${ANSI_RESET}  - Show this help message")
+            println("  ${ANSI_CYAN}clear${ANSI_RESET} - Clear the terminal screen")
+            println("  ${ANSI_CYAN}exit${ANSI_RESET}  - Exit the application")
+            println("  ${ANSI_CYAN}quit${ANSI_RESET}  - Exit the application")
+            println("Any other input will be processed by the AI.")
+            continue
+        }
+
+        if (input.equals("clear", ignoreCase = true)) {
+            print("\u001b[H\u001b[2J")
+            System.out.flush()
+            continue
         }
 
         val userMessageText = "$input\nonly give the cmd output and no explanation of what is it doing or what will happen or in code block | just plain text"
@@ -65,24 +92,46 @@ fun main(args: Array<String>) = runBlocking {
 
         try {
             val response = restClient.complete(req)
-            val textOutput = response.choices.firstOrNull()?.message?.content?.trim()
+            var textOutput = response.choices.firstOrNull()?.message?.content?.trim()
 
             if (textOutput.isNullOrEmpty()) {
-                println("No output generated.")
+                println("${ANSI_YELLOW}No output generated.${ANSI_RESET}")
                 continue
             }
 
-            println("Executing: $textOutput")
+            // Clean up markdown code blocks if the AI includes them
+            if (textOutput.startsWith("```")) {
+                val lines = textOutput.lines().toMutableList()
+                if (lines.first().startsWith("```")) {
+                    lines.removeFirst()
+                }
+                if (lines.last().startsWith("```")) {
+                    lines.removeLast()
+                }
+                textOutput = lines.joinToString("\n").trim()
+            }
+
+            println("${ANSI_PURPLE}Executing: $textOutput${ANSI_RESET}")
 
             val cmdToken = textOutput.split(" ")
 
             if (cmdToken.isNotEmpty()) {
                 val command = cmdToken[0].lowercase()
                 if (BlockedCommands.contains(command)) {
-                    println("Error: Blocked Command detected ($textOutput)")
+                    println("${ANSI_RED}Error: Blocked Command detected ($textOutput)${ANSI_RESET}")
                     promptMessages.removeLast() // remove the last user message to not pollute history
                     continue
                 }
+            }
+
+            // Ask for confirmation
+            print("${ANSI_YELLOW}Execute this command? [Y/n]: ${ANSI_RESET}")
+            val confirm = readlnOrNull()?.trim()?.lowercase()
+            if (confirm == "n" || confirm == "no") {
+                println("${ANSI_YELLOW}Command execution cancelled.${ANSI_RESET}")
+                // Remove the generated text from history since it wasn't executed
+                promptMessages.removeLast()
+                continue
             }
 
             // Execute the command
@@ -100,7 +149,7 @@ fun main(args: Array<String>) = runBlocking {
             val outputBuilder = java.lang.StringBuilder()
             var line: String?
             while (reader.readLine().also { line = it } != null) {
-                println(line)
+                println("${ANSI_WHITE}$line${ANSI_RESET}")
                 outputBuilder.append(line).append("\n")
             }
 
@@ -114,7 +163,7 @@ fun main(args: Array<String>) = runBlocking {
             // promptMessages.add(Message(role = "user", content = "Command Output:\n${outputBuilder.toString()}"))
 
         } catch (e: Exception) {
-            println("Synchronous execution error: ${e.message}\n")
+            println("${ANSI_RED}Synchronous execution error: ${e.message}\n${ANSI_RESET}")
             promptMessages.removeLast() // rollback on error
         }
     }

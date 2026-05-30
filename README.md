@@ -6,8 +6,10 @@ A command-line tool built with Kotlin that leverages Mistral AI to translate nat
 
 - **Cross-Platform**: Executes `cmd /c` on Windows and `bash -c` on Unix/Linux systems.
 - **Context-Aware**: Remembers the conversation history to perform multi-step operations efficiently.
-- **Safety**: Built-in blocked commands list (e.g., `rmdir`, `del`, `rm`) prevents execution of destructive operations.
+- **Safety**: Built-in blocked commands list (e.g., `rmdir`, `del`, `rm`) prevents execution of destructive operations, and prompts for user confirmation before executing any AI-generated command.
 - **Streaming Context**: Instructs the AI using `system.txt` for comprehensive prompt conditioning.
+- **Colorized Output**: Distinguishes between user input, AI commands, and terminal output using ANSI colors.
+- **Built-in Commands**: Includes `help` and `clear` commands executed locally for convenience.
 
 ## Prerequisites
 
@@ -49,8 +51,9 @@ MISTRAL_API_KEY="your_api_key" ./gradlew run --args="mistral-large-latest"
 1. Run the application. You'll see a prompt `> `.
 2. Type a natural language command, e.g., "list all files in the current directory".
 3. The AI processes your request and translates it into a shell command.
-4. The application executes the command and prints the output to your console.
-5. Type `exit` or `quit` to stop the application.
+4. You will be prompted to confirm execution: `Execute this command? [Y/n]`.
+5. The application executes the command and prints the output to your console.
+6. Type `help` to see available local commands, `clear` to clear the terminal, or `exit`/`quit` to stop the application.
 
 ## Blocked Commands
 
