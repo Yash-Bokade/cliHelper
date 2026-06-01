@@ -40,14 +40,16 @@ fun main(args: Array<String>) = runBlocking {
     println("${ANSI_YELLOW}Type 'exit' or 'quit' to close.${ANSI_RESET}")
     println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
 
-    val systemPrompt = object {}.javaClass.getResourceAsStream("/system.txt")?.bufferedReader()?.use { it.readText() }
+    val rawSystemPrompt = object {}.javaClass.getResourceAsStream("/system.txt")?.bufferedReader()?.use { it.readText() }
         ?: throw Exception("Could not find system.txt in resources")
+    val systemPrompt = "$rawSystemPrompt\n\nIMPORTANT: The current operating system is ${System.getProperty("os.name")}. Ensure all generated commands are compatible with this OS."
 
     val restClient = MistralRestClient(apiKey)
 
     val promptMessages = mutableListOf(
         Message(role = "system", content = systemPrompt)
     )
+    val commandHistory = mutableListOf<String>()
 
     while (true) {
         print("${ANSI_GREEN}> ${ANSI_RESET}")
@@ -69,6 +71,8 @@ fun main(args: Array<String>) = runBlocking {
             println("${ANSI_CYAN}Commands:${ANSI_RESET}")
             println("  ${ANSI_CYAN}help${ANSI_RESET}  - Show this help message")
             println("  ${ANSI_CYAN}clear${ANSI_RESET} - Clear the terminal screen")
+            println("  ${ANSI_CYAN}history${ANSI_RESET} - Show command history")
+            println("  ${ANSI_CYAN}sysinfo${ANSI_RESET} - Show system information")
             println("  ${ANSI_CYAN}exit${ANSI_RESET}  - Exit the application")
             println("  ${ANSI_CYAN}quit${ANSI_RESET}  - Exit the application")
             println("Any other input will be processed by the AI.")
@@ -81,6 +85,24 @@ fun main(args: Array<String>) = runBlocking {
             continue
         }
 
+        if (input.equals("history", ignoreCase = true)) {
+            println("${ANSI_CYAN}Command History:${ANSI_RESET}")
+            commandHistory.forEachIndexed { index, cmd ->
+                println("  ${index + 1}: $cmd")
+            }
+            continue
+        }
+
+        if (input.equals("sysinfo", ignoreCase = true)) {
+            println("${ANSI_CYAN}System Information:${ANSI_RESET}")
+            println("  OS: ${System.getProperty("os.name")}")
+            println("  Java Version: ${System.getProperty("java.version")}")
+            println("  Model: $model")
+            continue
+        }
+
+        commandHistory.add(input)
+
         val userMessageText = "$input\nonly give the cmd output and no explanation of what is it doing or what will happen or in code block | just plain text"
         promptMessages.add(Message(role = "user", content = userMessageText))
 
@@ -91,10 +113,16 @@ fun main(args: Array<String>) = runBlocking {
         )
 
         try {
-            val response = restClient.complete(req)
-            var textOutput = response.choices.firstOrNull()?.message?.content?.trim()
+            val fullResponse = java.lang.StringBuilder()
+            print("${ANSI_PURPLE}Generating command: ")
+            restClient.stream(req).collect { chunk ->
+                print(chunk)
+                fullResponse.append(chunk)
+            }
+            println(ANSI_RESET)
+            var textOutput = fullResponse.toString().trim()
 
-            if (textOutput.isNullOrEmpty()) {
+            if (textOutput.isEmpty()) {
                 println("${ANSI_YELLOW}No output generated.${ANSI_RESET}")
                 continue
             }
