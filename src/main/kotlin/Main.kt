@@ -28,9 +28,16 @@ fun main(args: Array<String>) = runBlocking {
     println("${ANSI_CYAN}|        CLI Helper powered by Mistral AI           |${ANSI_RESET}")
     println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
 
-    val apiKey = args[1]
+    var apiKey: String? = null
+    if (args.size > 1) {
+        apiKey = args[1]
+    }
     if (apiKey.isNullOrEmpty()) {
-        println("${ANSI_RED}Error: Please set the MISTRAL_API_KEY environment variable.${ANSI_RESET}")
+        apiKey = System.getenv("MISTRAL_API_KEY")
+    }
+
+    if (apiKey.isNullOrEmpty()) {
+        println("${ANSI_RED}Error: Please set the MISTRAL_API_KEY environment variable or pass it as the second argument.${ANSI_RESET}")
         return@runBlocking
     }
 
@@ -52,8 +59,10 @@ fun main(args: Array<String>) = runBlocking {
     )
     val commandHistory = mutableListOf<String>()
 
+    var currentDirectory = java.io.File(System.getProperty("user.dir"))
+
     while (true) {
-        print("${ANSI_GREEN}> ${ANSI_RESET}")
+        print("${ANSI_GREEN}${currentDirectory.absolutePath} > ${ANSI_RESET}")
         val rawInput = readlnOrNull()
         if (rawInput == null) {
             println("\n${ANSI_YELLOW}Exiting...${ANSI_RESET}")
@@ -99,6 +108,27 @@ fun main(args: Array<String>) = runBlocking {
             println("  OS: ${System.getProperty("os.name")}")
             println("  Java Version: ${System.getProperty("java.version")}")
             println("  Model: $model")
+            continue
+        }
+
+        if (input.equals("pwd", ignoreCase = true)) {
+            println(currentDirectory.absolutePath)
+            continue
+        }
+
+        if (input.startsWith("cd ", ignoreCase = true)) {
+            val targetDir = input.substring(3).trim()
+            val newDir = java.io.File(currentDirectory, targetDir).canonicalFile
+            if (newDir.exists() && newDir.isDirectory) {
+                currentDirectory = newDir
+            } else {
+                println("${ANSI_RED}Error: Directory not found - $targetDir${ANSI_RESET}")
+            }
+            continue
+        }
+
+        if (input.equals("cd", ignoreCase = true)) {
+            currentDirectory = java.io.File(System.getProperty("user.home"))
             continue
         }
 
@@ -183,6 +213,8 @@ fun main(args: Array<String>) = runBlocking {
             } else {
                 processBuilder.command("bash", "-c", textOutput)
             }
+
+            processBuilder.directory(currentDirectory)
 
             processBuilder.redirectErrorStream(true)
             val process = processBuilder.start()
