@@ -5,11 +5,11 @@ A command-line tool built with Kotlin that leverages Mistral AI to translate nat
 ## Features
 
 - **Cross-Platform**: Executes `cmd /c` on Windows and `bash -c` on Unix/Linux systems.
-- **Context-Aware**: Remembers the conversation history to perform multi-step operations efficiently.
-- **Safety**: Built-in blocked commands list (e.g., `rmdir`, `del`, `rm`) prevents execution of destructive operations, and prompts for user confirmation before executing any AI-generated command.
-- **Streaming Context**: Instructs the AI using `system.txt` for comprehensive prompt conditioning.
+- **Context-Aware**: Remembers the conversation history to perform multi-step operations efficiently. (currently working on that)
+- **Safety**: Built-in blocked commands list (e.g., `rmdir`, `del`, `rm`) prevents execution of destructive operations, and prompts for user confirmation before executing any AI-generated command.(prefered to read command before executing)
+- **Streaming Context**: Instructs the AI using `system.txt` for comprehensive prompt conditioning. (Modify the file to suit your needs)
 - **Colorized Output**: Distinguishes between user input, AI commands, and terminal output using ANSI colors.
-- **Built-in Commands**: Includes `help` and `clear` commands executed locally for convenience.
+- **Built-in Commands**: Includes `help` and `clear` commands executed locally for convenience. (Trying to add more commands)
 
 ## Prerequisites
 
@@ -18,33 +18,20 @@ A command-line tool built with Kotlin that leverages Mistral AI to translate nat
 
 ## Installation & Setup
 
-1. Clone this repository.
+1. Download the `cliHelper.jar` from the [releases](https://github.com/joseph-kang/cliHelper/releases) page.
 2. Ensure you have the required Java version installed.
 
 ## Usage
 
-You must provide your Mistral API key via the `MISTRAL_API_KEY` environment variable.
-
-### Running with Gradle (Unix/Linux/macOS)
+You must provide your Mistral API key While running the jar file.
 
 ```bash
-MISTRAL_API_KEY="your_mistral_api_key" ./gradlew run
-```
-
-### Running with Gradle (Windows)
-
-```cmd
-set MISTRAL_API_KEY=your_mistral_api_key
-gradlew.bat run
+java -jar .\cliHelper.jar "mistral-small-latest" "API_KEY"
 ```
 
 ### Passing a Custom Model
 
 By default, the application uses the `mistral-small-latest` model. You can specify a different model by passing it as an argument:
-
-```bash
-MISTRAL_API_KEY="your_api_key" ./gradlew run --args="mistral-large-latest"
-```
 
 ## How It Works
 
