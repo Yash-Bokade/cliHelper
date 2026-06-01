@@ -23,10 +23,15 @@ A command-line tool built with Kotlin that leverages Mistral AI to translate nat
 
 ## Usage
 
-You must provide your Mistral API key While running the jar file.
+You can provide your Mistral API key either as the second argument or by setting the `MISTRAL_API_KEY` environment variable.
 
 ```bash
-java -jar .\cliHelper.jar "mistral-small-latest" "API_KEY"
+# Using the environment variable:
+export MISTRAL_API_KEY="your-api-key"
+java -jar .\cliHelper.jar
+
+# Or passing it directly:
+java -jar .\cliHelper.jar "mistral-small-latest" "your-api-key"
 ```
 
 ### Passing a Custom Model
@@ -41,6 +46,9 @@ By default, the application uses the `mistral-small-latest` model. You can speci
 4. You will be prompted to confirm execution: `Execute this command? [Y/n]`.
 5. The application executes the command and prints the output to your console.
 6. Type `help` to see available local commands, `clear` to clear the terminal, or `exit`/`quit` to stop the application.
+
+### Working Directory Tracking
+The CLI tracks the current working directory, displaying it in the prompt. Built-in implementations of `cd` and `pwd` are available to change and display the current working directory efficiently without spawning a new process.
 
 ## Blocked Commands
 
