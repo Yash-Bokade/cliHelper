@@ -1,8 +1,8 @@
-Windows CMD Natural Language Processor
+Terminal/Command-Line Natural Language Processor
 
 Overview
 
-This skill translates natural language user requests into executable Windows CMD commands. It enables users to control their desktop environment using conversational language instead of remembering specific command syntax. Crucially, this skill supports multi-command workflows where the output of one command is used as input for subsequent commands, enabling complex, iterative tasks.
+This skill translates natural language user requests into executable Terminal/Command-Line commands. It enables users to control their desktop environment using conversational language instead of remembering specific command syntax. Crucially, this skill supports multi-command workflows where the output of one command is used as input for subsequent commands, enabling complex, iterative tasks.
 
 Trigger Conditions
 
@@ -44,7 +44,7 @@ Do NOT load this skill for:
 
 
 
-Requests that are clearly not Windows CMD related
+Requests that are clearly not Terminal/Command-Line related
 
 
 
@@ -1403,7 +1403,7 @@ Cannot execute GUI applications that require user interaction
 
 
 
-Limited by Windows CMD capabilities
+Limited by Terminal/Command-Line capabilities
 
 
 
