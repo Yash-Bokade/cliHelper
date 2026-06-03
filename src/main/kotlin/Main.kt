@@ -28,9 +28,9 @@ fun main(args: Array<String>) = runBlocking {
     println("${ANSI_CYAN}|        CLI Helper powered by Mistral AI           |${ANSI_RESET}")
     println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
 
-    val apiKey = args[1]
+    val apiKey = args.getOrNull(1) ?: System.getenv("MISTRAL_API_KEY")
     if (apiKey.isNullOrEmpty()) {
-        println("${ANSI_RED}Error: Please set the MISTRAL_API_KEY environment variable.${ANSI_RESET}")
+        println("${ANSI_RED}Error: Please provide the Mistral API key as the second argument or set the MISTRAL_API_KEY environment variable.${ANSI_RESET}")
         return@runBlocking
     }
 
@@ -169,7 +169,7 @@ fun main(args: Array<String>) = runBlocking {
             // Ask for confirmation
             print("${ANSI_YELLOW}Execute this command? [Y/n]: ${ANSI_RESET}")
             val confirm = readlnOrNull()?.trim()?.lowercase()
-            if (confirm == "n" || confirm == "no" || confirm?.split("")[0] == "n") {
+            if (confirm == "n" || confirm == "no" || confirm?.startsWith("n") == true) {
                 println("${ANSI_YELLOW}Command execution cancelled.${ANSI_RESET}")
                 // Remove the generated text from history since it wasn't executed
                 promptMessages.removeLast()
