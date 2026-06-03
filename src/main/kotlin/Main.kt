@@ -28,9 +28,9 @@ fun main(args: Array<String>) = runBlocking {
     println("${ANSI_CYAN}|        CLI Helper powered by Mistral AI           |${ANSI_RESET}")
     println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
 
-    val apiKey = args[1]
+    val apiKey = args.getOrNull(1) ?: System.getenv("MISTRAL_API_KEY")
     if (apiKey.isNullOrEmpty()) {
-        println("${ANSI_RED}Error: Please set the MISTRAL_API_KEY environment variable.${ANSI_RESET}")
+        println("${ANSI_RED}Error: Please provide the Mistral API Key as the second argument or set the MISTRAL_API_KEY environment variable.${ANSI_RESET}")
         return@runBlocking
     }
 
@@ -50,7 +50,15 @@ fun main(args: Array<String>) = runBlocking {
     val promptMessages = mutableListOf(
         Message(role = "system", content = systemPrompt)
     )
+    val historyFile = java.io.File(System.getProperty("user.home"), ".clihelper_history")
     val commandHistory = mutableListOf<String>()
+    if (historyFile.exists()) {
+        try {
+            commandHistory.addAll(historyFile.readLines())
+        } catch (e: Exception) {
+            println("${ANSI_YELLOW}Warning: Could not read history file.${ANSI_RESET}")
+        }
+    }
 
     while (true) {
         print("${ANSI_GREEN}> ${ANSI_RESET}")
@@ -74,6 +82,8 @@ fun main(args: Array<String>) = runBlocking {
             println("  ${ANSI_CYAN}clear${ANSI_RESET} - Clear the terminal screen")
             println("  ${ANSI_CYAN}history${ANSI_RESET} - Show command history")
             println("  ${ANSI_CYAN}sysinfo${ANSI_RESET} - Show system information")
+            println("  ${ANSI_CYAN}export <filename>${ANSI_RESET} - Export conversation history to file")
+            println("  ${ANSI_CYAN}model <name>${ANSI_RESET} - Change AI model")
             println("  ${ANSI_CYAN}exit${ANSI_RESET}  - Exit the application")
             println("  ${ANSI_CYAN}quit${ANSI_RESET}  - Exit the application")
             println("Any other input will be processed by the AI.")
@@ -115,9 +125,32 @@ fun main(args: Array<String>) = runBlocking {
             continue
         }
 
-
+        if (input.split(" ")[0].equals("export", ignoreCase = true)) {
+            val parts = input.split(" ")
+            val filename = if (parts.size > 1) parts[1] else "conversation.txt"
+            try {
+                val exportFile = java.io.File(filename)
+                exportFile.printWriter().use { out ->
+                    out.println("=== Conversation History ===")
+                    promptMessages.forEach { msg ->
+                        if (msg.role != "system") {
+                            out.println("[${msg.role.uppercase()}]:\n${msg.content}\n")
+                        }
+                    }
+                }
+                println("${ANSI_GREEN}Conversation exported to $filename${ANSI_RESET}")
+            } catch (e: Exception) {
+                println("${ANSI_RED}Failed to export: ${e.message}${ANSI_RESET}")
+            }
+            continue
+        }
 
         commandHistory.add(input)
+        try {
+            historyFile.appendText("$input\n")
+        } catch (e: Exception) {
+            // Ignore write errors to avoid disrupting flow
+        }
 
         val userMessageText = "$input\nonly give the cmd output and no explanation of what is it doing or what will happen or in code block | just plain text"
         promptMessages.add(Message(role = "user", content = userMessageText))

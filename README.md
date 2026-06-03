@@ -9,7 +9,7 @@ A command-line tool built with Kotlin that leverages Mistral AI to translate nat
 - **Safety**: Built-in blocked commands list (e.g., `rmdir`, `del`, `rm`) prevents execution of destructive operations, and prompts for user confirmation before executing any AI-generated command.(prefered to read command before executing)
 - **Streaming Context**: Instructs the AI using `system.txt` for comprehensive prompt conditioning. (Modify the file to suit your needs)
 - **Colorized Output**: Distinguishes between user input, AI commands, and terminal output using ANSI colors.
-- **Built-in Commands**: Includes `help` and `clear` commands executed locally for convenience. (Trying to add more commands)
+- **Built-in Commands**: Includes `help`, `clear`, `history`, `sysinfo`, `model`, and `export` commands executed locally for convenience.
 
 ## Prerequisites
 
@@ -23,15 +23,28 @@ A command-line tool built with Kotlin that leverages Mistral AI to translate nat
 
 ## Usage
 
-You must provide your Mistral API key While running the jar file.
+You must provide your Mistral API key either by setting the `MISTRAL_API_KEY` environment variable or passing it as the second argument when running the jar file.
 
+**Using Environment Variable:**
 ```bash
-java -jar .\cliHelper.jar "mistral-small-latest" "API_KEY"
+export MISTRAL_API_KEY="your_api_key_here"
+java -jar cliHelper.jar
 ```
 
-### Passing a Custom Model
+**Using Arguments:**
+```bash
+java -jar cliHelper.jar "mistral-small-latest" "your_api_key_here"
+```
 
-By default, the application uses the `mistral-small-latest` model. You can specify a different model by passing it as an argument:
+### Built-in Local Commands
+
+- `help` - Show the help message
+- `clear` - Clear the terminal screen
+- `history` - Show the command history from the current session and previous sessions (persistent history is saved in `~/.clihelper_history`)
+- `sysinfo` - Show system information (OS, Java version, and current model)
+- `export <filename>` - Export the conversation history with the AI to a file for saving complex workflows (defaults to `conversation.txt` if no filename is given)
+- `model <name>` - Change the AI model during runtime
+- `exit` / `quit` - Stop the application
 
 ## How It Works
 
@@ -40,7 +53,7 @@ By default, the application uses the `mistral-small-latest` model. You can speci
 3. The AI processes your request and translates it into a shell command.
 4. You will be prompted to confirm execution: `Execute this command? [Y/n]`.
 5. The application executes the command and prints the output to your console.
-6. Type `help` to see available local commands, `clear` to clear the terminal, or `exit`/`quit` to stop the application.
+6. Type `help` to see available local commands.
 
 ## Blocked Commands
 
