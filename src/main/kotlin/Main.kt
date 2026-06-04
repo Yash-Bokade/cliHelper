@@ -75,7 +75,20 @@ fun main(args: Array<String>) = runBlocking {
     val promptMessages = mutableListOf(
         Message(role = "system", content = systemPrompt)
     )
+
+    val historyFile = File(System.getProperty("user.home"), ".clihelper_history")
     val commandHistory = mutableListOf<String>()
+    val customEnvVars = mutableMapOf<String, String>()
+
+    if (historyFile.exists()) {
+        try {
+            historyFile.useLines { lines ->
+                commandHistory.addAll(lines)
+            }
+        } catch (e: Exception) {
+            println("${ANSI_RED}Warning: Could not read history file: ${e.message}${ANSI_RESET}")
+        }
+    }
 
     while (true) {
         print("${ANSI_GREEN}> ${ANSI_RESET}")
@@ -105,7 +118,8 @@ fun main(args: Array<String>) = runBlocking {
             println("  ${ANSI_CYAN}history${ANSI_RESET} - Show command history")
             println("  ${ANSI_CYAN}config${ANSI_RESET} - Show configuration")
             println("  ${ANSI_CYAN}model <model_name>${ANSI_RESET} - Change model")
-//            println("  ${ANSI_CYAN}reload${ANSI_RESET} - Reload configuration")
+            println("  ${ANSI_CYAN}export VAR=value${ANSI_RESET} - Set environment variable")
+            println("  ${ANSI_CYAN}reload${ANSI_RESET} - Reload configuration")
             println("  ${ANSI_CYAN}sysinfo${ANSI_RESET} - Show system information")
             println("  ${ANSI_CYAN}exit${ANSI_RESET}  - Exit the application")
             println("  ${ANSI_CYAN}quit${ANSI_RESET}  - Exit the application")
@@ -117,6 +131,18 @@ fun main(args: Array<String>) = runBlocking {
         if (input.equals("clear", ignoreCase = true)) {
             print("\u001b[H\u001b[2J")
             System.out.flush()
+            continue
+        }
+
+        // Export environment variables
+        if (input.startsWith("export ", ignoreCase = true)) {
+            val parts = input.substring(7).trim().split("=", limit = 2)
+            if (parts.size == 2) {
+                customEnvVars[parts[0].trim()] = parts[1].trim()
+                println("${ANSI_GREEN}Exported ${parts[0].trim()}=${parts[1].trim()}${ANSI_RESET}")
+            } else {
+                println("${ANSI_RED}Invalid export format. Use: export VAR=value${ANSI_RESET}")
+            }
             continue
         }
 
@@ -151,8 +177,10 @@ fun main(args: Array<String>) = runBlocking {
 
         // Reload command
         if (input.equals("reload", ignoreCase = true)) {
-            println("---not yet implemented---")
-            //todo: implement reload config file
+            setupConfig()
+            model = config?.model ?: "mistral-small-latest"
+            println("${ANSI_GREEN}Configuration reloaded successfully.${ANSI_RESET}")
+            println("${ANSI_YELLOW}Using model: $model${ANSI_RESET}")
             continue
         }
 
@@ -179,6 +207,11 @@ fun main(args: Array<String>) = runBlocking {
         }
 
         commandHistory.add(input)
+        try {
+            historyFile.appendText("$input${System.lineSeparator()}")
+        } catch (e: Exception) {
+            println("${ANSI_RED}Warning: Could not save to history file: ${e.message}${ANSI_RESET}")
+        }
 
     // TODO Implement Different answers Like
         //  - "I don't know how to do that"
@@ -219,7 +252,7 @@ fun main(args: Array<String>) = runBlocking {
                 if (lines.last().startsWith("```")) {
                     lines.removeLast()
                 }
-                textOutput = lines.joinToString("\n").trim()
+                textOutput = lines.joinToString(System.lineSeparator()).trim()
             }
 
             val cmdToken = textOutput.split(" ")
@@ -238,7 +271,7 @@ fun main(args: Array<String>) = runBlocking {
             // Ask for confirmation
             print("${ANSI_YELLOW}Execute this command? [Y/n]: ${ANSI_RESET}")
             val confirm = readlnOrNull()?.trim()?.lowercase()
-            if (confirm == "n" || confirm == "no" || confirm?.split("")[0] == "n") {
+            if (confirm == "n" || confirm == "no" || confirm?.startsWith("n") == true) {
                 println("${ANSI_YELLOW}Command execution cancelled.${ANSI_RESET}")
                 // Remove the generated text from history since it wasn't executed
                 promptMessages.removeLast()
@@ -247,6 +280,11 @@ fun main(args: Array<String>) = runBlocking {
             println("${ANSI_PURPLE}Executing: $textOutput${ANSI_RESET}")
             // Execute the command
             val processBuilder = ProcessBuilder()
+
+            // Apply custom environment variables
+            val env = processBuilder.environment()
+            env.putAll(customEnvVars)
+
             if (isWindows()) {
                 processBuilder.command("cmd", "/c", textOutput)
             } else {
@@ -261,7 +299,7 @@ fun main(args: Array<String>) = runBlocking {
             var line: String?
             while (reader.readLine().also { line = it } != null) {
                 println("${ANSI_WHITE}$line${ANSI_RESET}")
-                outputBuilder.append(line).append("\n")
+                outputBuilder.append(line).append(System.lineSeparator())
             }
 
             process.waitFor()
@@ -269,7 +307,7 @@ fun main(args: Array<String>) = runBlocking {
             // Add Assistant response to the history so model has context
             promptMessages.add(Message(role = "assistant", content = textOutput))
 
-            promptMessages.add(Message(role = "user", content = "Command Output:\n${outputBuilder.toString()}"))
+            promptMessages.add(Message(role = "user", content = "Command Output:${System.lineSeparator()}${outputBuilder.toString()}"))
 
         } catch (e: Exception) {
             println("${ANSI_RED}Synchronous execution error: ${e.message}\n${ANSI_RESET}")
