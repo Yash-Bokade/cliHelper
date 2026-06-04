@@ -1,7 +1,7 @@
 # CLI Helper powered by Mistral AI
 
 A command-line tool built with Kotlin that leverages Mistral AI to translate natural language into executable terminal/command-prompt commands.
-(INSTALL)[https://yash-bokade.github.io/cliHelper/pages]
+[Installation Process](https://yash-bokade.github.io/cliHelper/pages)
 ## Features
 
 - **Cross-Platform**: Executes `cmd /c` on Windows and `bash -c` on Unix/Linux systems.
