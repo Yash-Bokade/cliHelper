@@ -3,8 +3,8 @@
 // ========================================
 document.getElementById("btn-download").addEventListener("click", function () {
   const link = document.createElement("a");
-  link.href = "cliHelper-1.0.jar";
-  link.download = "cliHelper-1.0.jar";
+  link.href = "cli-helper v1 Releases.zip";
+  link.download = "cli-helper v1 Releases.zip";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

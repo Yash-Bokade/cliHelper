@@ -1,10 +1,15 @@
 package me.yashbokade
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.decodeFromString
 import java.io.BufferedReader
+import kotlinx.serialization.json.*
+import java.io.File
 import java.io.InputStreamReader
 import java.util.Locale
 
+var configFile = "Config.json"
+var config: ConfigFile? = null
 val AllowedCommands = listOf("ls", "dir", "cd", "mkdir", "echo", "clear", "exit")
 val BlockedCommands = listOf("rmdir", "del", "rm")
 
@@ -23,26 +28,46 @@ fun isWindows(): Boolean {
     return System.getProperty("os.name").lowercase(Locale.getDefault()).contains("win")
 }
 
+fun setupConfig() {
+    val a = File(configFile)
+    if (!a.exists()){
+        a.createNewFile()
+        a.writeText(Json.encodeToString(
+            ConfigFile.serializer(),
+            ConfigFile(model = "mistral-small-latest", apiKey = "MISTRAL_API_KEY")))
+    }
+    else{
+        println(Json.decodeFromString<ConfigFile>(a.readText()))
+        config = Json.decodeFromString<ConfigFile>(a.readText())
+    }
+}
+
 fun main(args: Array<String>) = runBlocking {
+    setupConfig()
     println("${ANSI_BLUE}=====================================================${ANSI_RESET}")
     println("${ANSI_CYAN}|        CLI Helper powered by Mistral AI           |${ANSI_RESET}")
     println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
 
-    val apiKey = args[1]
+
+    val apiKey = config?.apiKey
     if (apiKey.isNullOrEmpty()) {
         println("${ANSI_RED}Error: Please set the MISTRAL_API_KEY environment variable.${ANSI_RESET}")
         return@runBlocking
     }
 
-    var model = args.firstOrNull() ?: "mistral-small-latest"
+    var model = config?.model ?: "mistral-small-latest"
     println("${ANSI_YELLOW}Using model: $model${ANSI_RESET}")
-    println("${ANSI_YELLOW}Type 'exit' or 'quit' to close.${ANSI_RESET}")
+    println("${ANSI_YELLOW}Type 'help' for list of commands.${ANSI_RESET}")
+    println("${ANSI_RED}Type 'exit' or 'quit' to close.${ANSI_RESET}")
     println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
 
-    val rawSystemPrompt = object {}.javaClass.getResourceAsStream("/system.txt")
-        ?.bufferedReader()
-        ?.use { it.readText() }
-        ?: throw Exception("Could not find system.txt in resources")
+    val rawSystemPrompt = File(config?.systemPrompt ?: "system.txt").readText()
+
+//    val rawSystemPrompt = object {}.javaClass.getResourceAsStream("/")
+//        ?.bufferedReader()
+//        ?.use { it.readText() }
+//        ?: throw Exception("Could not find system.txt in resources")
+
     val systemPrompt = "$rawSystemPrompt\n\nIMPORTANT: The current operating system is ${System.getProperty("os.name")}. Ensure all generated commands are compatible with this OS."
 
     val restClient = MistralRestClient(apiKey)
@@ -68,11 +93,19 @@ fun main(args: Array<String>) = runBlocking {
             break
         }
 
+//        COMMAND ---
+//
+//        All commands here With custom Actions.
+
+        // shows the help msg
         if (input.equals("help", ignoreCase = true)) {
             println("${ANSI_CYAN}Commands:${ANSI_RESET}")
             println("  ${ANSI_CYAN}help${ANSI_RESET}  - Show this help message")
             println("  ${ANSI_CYAN}clear${ANSI_RESET} - Clear the terminal screen")
             println("  ${ANSI_CYAN}history${ANSI_RESET} - Show command history")
+            println("  ${ANSI_CYAN}config${ANSI_RESET} - Show configuration")
+            println("  ${ANSI_CYAN}model <model_name>${ANSI_RESET} - Change model")
+//            println("  ${ANSI_CYAN}reload${ANSI_RESET} - Reload configuration")
             println("  ${ANSI_CYAN}sysinfo${ANSI_RESET} - Show system information")
             println("  ${ANSI_CYAN}exit${ANSI_RESET}  - Exit the application")
             println("  ${ANSI_CYAN}quit${ANSI_RESET}  - Exit the application")
@@ -80,12 +113,14 @@ fun main(args: Array<String>) = runBlocking {
             continue
         }
 
+        // clear terminal
         if (input.equals("clear", ignoreCase = true)) {
             print("\u001b[H\u001b[2J")
             System.out.flush()
             continue
         }
 
+        // List of all old prompts
         if (input.equals("history", ignoreCase = true)) {
             println("${ANSI_CYAN}Command History:${ANSI_RESET}")
             commandHistory.forEachIndexed { index, cmd ->
@@ -94,6 +129,7 @@ fun main(args: Array<String>) = runBlocking {
             continue
         }
 
+        // your current system information
         if (input.equals("sysinfo", ignoreCase = true)) {
             println("${ANSI_CYAN}System Information:${ANSI_RESET}")
             println("  OS: ${System.getProperty("os.name")}")
@@ -102,22 +138,52 @@ fun main(args: Array<String>) = runBlocking {
             continue
         }
 
+        // Shows loaded Config file
+        if (input.equals("config", ignoreCase = true)) {
+            println("${ANSI_CYAN}Configuration:${ANSI_RESET}")
+            println("  Model: $model")
+            println("  API Key: ${apiKey.take(4)}...${apiKey.takeLast(4)}")
+            println("  System Prompt: ${config?.systemPrompt ?: "Not set"}")
+            println("  Allowed Commands: ${AllowedCommands.joinToString(", ")}")
+            println("  Blocked Commands: ${BlockedCommands.joinToString(", ")}")
+            continue
+        }
+
+        // Reload command
+        if (input.equals("reload", ignoreCase = true)) {
+            println("---not yet implemented---")
+            //todo: implement reload config file
+            continue
+        }
+
+        // allows update of model
         if (input.equals("model", ignoreCase = true)) {
             println("Current Model = ${model}")
             println("Enter New Model Name")
-            model = readln().trim()
+            val d = readln().trim()
+
+
+            // TODO Make this better by checking if the model is valid --- [BEFORE] v4
+            if(d.split("-").size<3) print("model name eg - [mistral-small-latest]")
+            if(d!=model) model = d
+
             System.out.flush()
+            println("Model changed to $model")
             continue
         }
+        // another version for inline model updating
         if (input.split(" ")[0].equals("model" , ignoreCase = true)) {
             model = input.split(" ")[1]
             System.out.flush()
             continue
         }
 
-
-
         commandHistory.add(input)
+
+    // TODO Implement Different answers Like
+        //  - "I don't know how to do that"
+        //  - "I need Mode Data"
+
 
         val userMessageText = "$input\nonly give the cmd output and no explanation of what is it doing or what will happen or in code block | just plain text"
         promptMessages.add(Message(role = "user", content = userMessageText))
@@ -125,7 +191,7 @@ fun main(args: Array<String>) = runBlocking {
         val req = ChatRequest(
             model = model,
             messages = promptMessages,
-            temperature = 0.4
+            temperature = config?.temperature ?: 0.7,
         )
 
         try {
@@ -143,6 +209,7 @@ fun main(args: Array<String>) = runBlocking {
                 continue
             }
 
+            // TODO Optimize this checking of the command
             // Clean up markdown code blocks if the AI includes them
             if (textOutput.startsWith("```")) {
                 val lines = textOutput.lines().toMutableList()
@@ -165,6 +232,8 @@ fun main(args: Array<String>) = runBlocking {
                     continue
                 }
             }
+
+    // TODO fix theallowed commands checking
 
             // Ask for confirmation
             print("${ANSI_YELLOW}Execute this command? [Y/n]: ${ANSI_RESET}")

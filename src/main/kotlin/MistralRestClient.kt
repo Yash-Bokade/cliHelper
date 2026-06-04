@@ -20,6 +20,21 @@ import java.time.Duration
 // ==========================================
 
 @Serializable
+data class ConfigFile(
+    val model: String,
+    val apiKey: String,
+    val systemPrompt: String?= null,
+    val prefix: String? = null,
+    val suffix: String? = null,
+    val temperature: Double? = null,
+//    @SerialName("top_p") val topP: Double? = null,
+//    @SerialName("max_tokens") val maxTokens: Int? = null,
+//    val stream: Boolean = false,
+//    @SerialName("response_format") val responseFormat: ResponseFormat? = null,
+//    @SerialName("safe_prompt") val safePrompt: Boolean = false
+)
+
+@Serializable
 data class Message(
     val role: String, // "system", "user", or "assistant"
     val content: String,
