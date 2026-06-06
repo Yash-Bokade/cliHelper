@@ -49,13 +49,13 @@ fun main(args: Array<String>) = runBlocking {
     println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
 
 
-    val apiKey = config?.apiKey
-    if (apiKey.isNullOrEmpty()) {
-        println("${ANSI_RED}Error: Please set the MISTRAL_API_KEY environment variable.${ANSI_RESET}")
+    var model = args.getOrNull(0) ?: config?.model ?: "mistral-small-latest"
+    var apiKey = args.getOrNull(1) ?: System.getenv("MISTRAL_API_KEY") ?: config?.apiKey
+
+    if (apiKey.isNullOrEmpty() || apiKey == "MISTRAL_API_KEY") {
+        println("${ANSI_RED}Error: Please provide a Mistral API key via CLI arguments, MISTRAL_API_KEY environment variable, or Config.json.${ANSI_RESET}")
         return@runBlocking
     }
-
-    var model = config?.model ?: "mistral-small-latest"
     println("${ANSI_YELLOW}Using model: $model${ANSI_RESET}")
     println("${ANSI_YELLOW}Type 'help' for list of commands.${ANSI_RESET}")
     println("${ANSI_RED}Type 'exit' or 'quit' to close.${ANSI_RESET}")
@@ -76,6 +76,10 @@ fun main(args: Array<String>) = runBlocking {
         Message(role = "system", content = systemPrompt)
     )
     val commandHistory = mutableListOf<String>()
+    val historyFile = File(System.getProperty("user.home"), ".clihelper_history")
+    if (historyFile.exists()) {
+        commandHistory.addAll(historyFile.readLines())
+    }
 
     while (true) {
         print("${ANSI_GREEN}> ${ANSI_RESET}")
@@ -142,7 +146,7 @@ fun main(args: Array<String>) = runBlocking {
         if (input.equals("config", ignoreCase = true)) {
             println("${ANSI_CYAN}Configuration:${ANSI_RESET}")
             println("  Model: $model")
-            println("  API Key: ${apiKey.take(4)}...${apiKey.takeLast(4)}")
+            println("  API Key: ${apiKey?.take(4)}...${apiKey?.takeLast(4)}")
             println("  System Prompt: ${config?.systemPrompt ?: "Not set"}")
             println("  Allowed Commands: ${AllowedCommands.joinToString(", ")}")
             println("  Blocked Commands: ${BlockedCommands.joinToString(", ")}")
@@ -151,8 +155,12 @@ fun main(args: Array<String>) = runBlocking {
 
         // Reload command
         if (input.equals("reload", ignoreCase = true)) {
-            println("---not yet implemented---")
-            //todo: implement reload config file
+            setupConfig()
+            model = config?.model ?: "mistral-small-latest"
+            apiKey = config?.apiKey ?: apiKey
+            val updatedSystemPrompt = File(config?.systemPrompt ?: "system.txt").readText() + "\n\nIMPORTANT: The current operating system is ${System.getProperty("os.name")}. Ensure all generated commands are compatible with this OS."
+            promptMessages[0] = Message(role = "system", content = updatedSystemPrompt)
+            println("${ANSI_GREEN}Configuration reloaded successfully.${ANSI_RESET}")
             continue
         }
 
@@ -179,6 +187,7 @@ fun main(args: Array<String>) = runBlocking {
         }
 
         commandHistory.add(input)
+        historyFile.appendText("$input${System.lineSeparator()}")
 
     // TODO Implement Different answers Like
         //  - "I don't know how to do that"
@@ -219,7 +228,7 @@ fun main(args: Array<String>) = runBlocking {
                 if (lines.last().startsWith("```")) {
                     lines.removeLast()
                 }
-                textOutput = lines.joinToString("\n").trim()
+                textOutput = lines.joinToString(System.lineSeparator()).trim()
             }
 
             val cmdToken = textOutput.split(" ")
@@ -238,7 +247,7 @@ fun main(args: Array<String>) = runBlocking {
             // Ask for confirmation
             print("${ANSI_YELLOW}Execute this command? [Y/n]: ${ANSI_RESET}")
             val confirm = readlnOrNull()?.trim()?.lowercase()
-            if (confirm == "n" || confirm == "no" || confirm?.split("")[0] == "n") {
+            if (confirm == "n" || confirm == "no" || confirm?.startsWith("n") == true) {
                 println("${ANSI_YELLOW}Command execution cancelled.${ANSI_RESET}")
                 // Remove the generated text from history since it wasn't executed
                 promptMessages.removeLast()
