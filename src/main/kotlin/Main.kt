@@ -49,13 +49,13 @@ fun main(args: Array<String>) = runBlocking {
     println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
 
 
-    val apiKey = config?.apiKey
+    val apiKey = args.getOrNull(1) ?: System.getenv("MISTRAL_API_KEY") ?: config?.apiKey
     if (apiKey.isNullOrEmpty()) {
         println("${ANSI_RED}Error: Please set the MISTRAL_API_KEY environment variable.${ANSI_RESET}")
         return@runBlocking
     }
 
-    var model = config?.model ?: "mistral-small-latest"
+    var model = args.getOrNull(0) ?: config?.model ?: "mistral-small-latest"
     println("${ANSI_YELLOW}Using model: $model${ANSI_RESET}")
     println("${ANSI_YELLOW}Type 'help' for list of commands.${ANSI_RESET}")
     println("${ANSI_RED}Type 'exit' or 'quit' to close.${ANSI_RESET}")
@@ -151,8 +151,9 @@ fun main(args: Array<String>) = runBlocking {
 
         // Reload command
         if (input.equals("reload", ignoreCase = true)) {
-            println("---not yet implemented---")
-            //todo: implement reload config file
+            setupConfig()
+            model = config?.model ?: "mistral-small-latest"
+            println("Configuration reloaded.")
             continue
         }
 
@@ -172,8 +173,8 @@ fun main(args: Array<String>) = runBlocking {
             continue
         }
         // another version for inline model updating
-        if (input.split(" ")[0].equals("model" , ignoreCase = true)) {
-            model = input.split(" ")[1]
+        if (input.startsWith("model ", ignoreCase = true)) {
+            model = input.substring("model ".length).trim()
             System.out.flush()
             continue
         }
@@ -219,7 +220,7 @@ fun main(args: Array<String>) = runBlocking {
                 if (lines.last().startsWith("```")) {
                     lines.removeLast()
                 }
-                textOutput = lines.joinToString("\n").trim()
+                textOutput = lines.joinToString(System.lineSeparator()).trim()
             }
 
             val cmdToken = textOutput.split(" ")
@@ -238,7 +239,7 @@ fun main(args: Array<String>) = runBlocking {
             // Ask for confirmation
             print("${ANSI_YELLOW}Execute this command? [Y/n]: ${ANSI_RESET}")
             val confirm = readlnOrNull()?.trim()?.lowercase()
-            if (confirm == "n" || confirm == "no" || confirm?.split("")[0] == "n") {
+            if (confirm == "n" || confirm == "no" || confirm?.startsWith("n") == true) {
                 println("${ANSI_YELLOW}Command execution cancelled.${ANSI_RESET}")
                 // Remove the generated text from history since it wasn't executed
                 promptMessages.removeLast()
@@ -261,7 +262,7 @@ fun main(args: Array<String>) = runBlocking {
             var line: String?
             while (reader.readLine().also { line = it } != null) {
                 println("${ANSI_WHITE}$line${ANSI_RESET}")
-                outputBuilder.append(line).append("\n")
+                outputBuilder.append(line).append(System.lineSeparator())
             }
 
             process.waitFor()
