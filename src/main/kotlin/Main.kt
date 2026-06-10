@@ -13,6 +13,8 @@ var config: ConfigFile? = null
 val AllowedCommands = listOf("ls", "dir", "cd", "mkdir", "echo", "clear", "exit")
 val BlockedCommands = listOf("rmdir", "del", "rm")
 
+val prettyJson = Json { prettyPrint = true }
+
 // ANSI Color Codes
 const val ANSI_RESET = "\u001B[0m"
 const val ANSI_BLACK = "\u001B[30m"
@@ -32,7 +34,7 @@ fun setupConfig() {
     val a = File(configFile)
     if (!a.exists()){
         a.createNewFile()
-        a.writeText(Json.encodeToString(
+        a.writeText(prettyJson.encodeToString(
             ConfigFile.serializer(),
             ConfigFile(model = "mistral-small-latest", apiKey = "MISTRAL_API_KEY")))
     }
@@ -105,7 +107,7 @@ fun main(args: Array<String>) = runBlocking {
             println("  ${ANSI_CYAN}history${ANSI_RESET} - Show command history")
             println("  ${ANSI_CYAN}config${ANSI_RESET} - Show configuration")
             println("  ${ANSI_CYAN}model <model_name>${ANSI_RESET} - Change model")
-//            println("  ${ANSI_CYAN}reload${ANSI_RESET} - Reload configuration")
+            println("  ${ANSI_CYAN}reload${ANSI_RESET} - Reload configuration")
             println("  ${ANSI_CYAN}sysinfo${ANSI_RESET} - Show system information")
             println("  ${ANSI_CYAN}exit${ANSI_RESET}  - Exit the application")
             println("  ${ANSI_CYAN}quit${ANSI_RESET}  - Exit the application")
@@ -151,8 +153,8 @@ fun main(args: Array<String>) = runBlocking {
 
         // Reload command
         if (input.equals("reload", ignoreCase = true)) {
-            println("---not yet implemented---")
-            //todo: implement reload config file
+            setupConfig()
+            println("${ANSI_GREEN}Configuration reloaded.${ANSI_RESET}")
             continue
         }
 
@@ -162,18 +164,33 @@ fun main(args: Array<String>) = runBlocking {
             println("Enter New Model Name")
             val d = readln().trim()
 
+            if (d.isEmpty()) {
+                println("${ANSI_YELLOW}Model name cannot be empty. Model unchanged.${ANSI_RESET}")
+                continue
+            }
+            if (!d.contains("-")) {
+                println("${ANSI_YELLOW}Warning: Valid Mistral models typically look like 'mistral-small-latest'.${ANSI_RESET}")
+            }
 
-            // TODO Make this better by checking if the model is valid --- [BEFORE] v4
-            if(d.split("-").size<3) print("model name eg - [mistral-small-latest]")
-            if(d!=model) model = d
-
+            if (d != model) {
+                model = d
+                println("Model changed to $model")
+            } else {
+                println("Model is already $model")
+            }
             System.out.flush()
-            println("Model changed to $model")
             continue
         }
+
         // another version for inline model updating
         if (input.split(" ")[0].equals("model" , ignoreCase = true)) {
-            model = input.split(" ")[1]
+            val parts = input.split(" ")
+            if (parts.size > 1 && parts[1].isNotBlank()) {
+                model = parts[1]
+                println("Model changed to $model")
+            } else {
+                println("${ANSI_YELLOW}Please provide a model name, e.g., 'model mistral-small-latest'${ANSI_RESET}")
+            }
             System.out.flush()
             continue
         }
@@ -211,21 +228,16 @@ fun main(args: Array<String>) = runBlocking {
 
             // TODO Optimize this checking of the command
             // Clean up markdown code blocks if the AI includes them
-            if (textOutput.startsWith("```")) {
-                val lines = textOutput.lines().toMutableList()
-                if (lines.first().startsWith("```")) {
-                    lines.removeFirst()
-                }
-                if (lines.last().startsWith("```")) {
-                    lines.removeLast()
-                }
-                textOutput = lines.joinToString("\n").trim()
-            }
+            textOutput = textOutput
+                .replace(Regex("^```[a-zA-Z]*\\n", RegexOption.MULTILINE), "")
+                .replace(Regex("\\n```$", RegexOption.MULTILINE), "")
+                .replace(Regex("^```$", RegexOption.MULTILINE), "")
+                .trim()
 
             val cmdToken = textOutput.split(" ")
 
             if (cmdToken.isNotEmpty()) {
-                val command = cmdToken[0].lowercase()
+                val command = cmdToken[0].substringAfterLast("/").substringAfterLast("\\").lowercase()
                 if (BlockedCommands.contains(command)) {
                     println("${ANSI_RED}Error: Blocked Command detected ($textOutput)${ANSI_RESET}")
                     promptMessages.removeLast() // remove the last user message to not pollute history
@@ -233,12 +245,10 @@ fun main(args: Array<String>) = runBlocking {
                 }
             }
 
-    // TODO fix theallowed commands checking
-
             // Ask for confirmation
             print("${ANSI_YELLOW}Execute this command? [Y/n]: ${ANSI_RESET}")
             val confirm = readlnOrNull()?.trim()?.lowercase()
-            if (confirm == "n" || confirm == "no" || confirm?.split("")[0] == "n") {
+            if (confirm == "n" || confirm == "no" || confirm?.startsWith("n") == true) {
                 println("${ANSI_YELLOW}Command execution cancelled.${ANSI_RESET}")
                 // Remove the generated text from history since it wasn't executed
                 promptMessages.removeLast()
