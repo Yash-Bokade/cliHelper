@@ -51,13 +51,14 @@ fun main(args: Array<String>) = runBlocking {
     println("${ANSI_CYAN}=====================================================${ANSI_RESET}")
 
 
-    val apiKey = config?.apiKey
-    if (apiKey.isNullOrEmpty()) {
-        println("${ANSI_RED}Error: Please set the MISTRAL_API_KEY environment variable.${ANSI_RESET}")
+    var model = if (args.isNotEmpty()) args[0] else config?.model ?: "mistral-small-latest"
+
+    val apiKey = if (args.size > 1) args[1] else System.getenv("MISTRAL_API_KEY") ?: config?.apiKey
+
+    if (apiKey.isNullOrEmpty() || apiKey == "MISTRAL_API_KEY") {
+        println("${ANSI_RED}Error: Please provide a valid Mistral API Key via the 2nd CLI argument, MISTRAL_API_KEY environment variable, or Config.json.${ANSI_RESET}")
         return@runBlocking
     }
-
-    var model = config?.model ?: "mistral-small-latest"
     println("${ANSI_YELLOW}Using model: $model${ANSI_RESET}")
     println("${ANSI_YELLOW}Type 'help' for list of commands.${ANSI_RESET}")
     println("${ANSI_RED}Type 'exit' or 'quit' to close.${ANSI_RESET}")
@@ -70,14 +71,23 @@ fun main(args: Array<String>) = runBlocking {
 //        ?.use { it.readText() }
 //        ?: throw Exception("Could not find system.txt in resources")
 
-    val systemPrompt = "$rawSystemPrompt\n\nIMPORTANT: The current operating system is ${System.getProperty("os.name")}. Ensure all generated commands are compatible with this OS."
+    val systemPrompt = "$rawSystemPrompt" + System.lineSeparator() + System.lineSeparator() + "IMPORTANT: The current operating system is ${System.getProperty("os.name")}. Ensure all generated commands are compatible with this OS."
 
     val restClient = MistralRestClient(apiKey)
 
     val promptMessages = mutableListOf(
         Message(role = "system", content = systemPrompt)
     )
+
+    val historyFile = File(System.getProperty("user.home"), ".clihelper_history")
     val commandHistory = mutableListOf<String>()
+    if (historyFile.exists()) {
+        try {
+            commandHistory.addAll(historyFile.readLines())
+        } catch (e: Exception) {
+            println("${ANSI_YELLOW}Warning: Could not read command history file.${ANSI_RESET}")
+        }
+    }
 
     while (true) {
         print("${ANSI_GREEN}> ${ANSI_RESET}")
@@ -105,6 +115,7 @@ fun main(args: Array<String>) = runBlocking {
             println("  ${ANSI_CYAN}help${ANSI_RESET}  - Show this help message")
             println("  ${ANSI_CYAN}clear${ANSI_RESET} - Clear the terminal screen")
             println("  ${ANSI_CYAN}history${ANSI_RESET} - Show command history")
+            println("  ${ANSI_CYAN}export <file>${ANSI_RESET} - Export command history to a file")
             println("  ${ANSI_CYAN}config${ANSI_RESET} - Show configuration")
             println("  ${ANSI_CYAN}model <model_name>${ANSI_RESET} - Change model")
             println("  ${ANSI_CYAN}reload${ANSI_RESET} - Reload configuration")
@@ -127,6 +138,23 @@ fun main(args: Array<String>) = runBlocking {
             println("${ANSI_CYAN}Command History:${ANSI_RESET}")
             commandHistory.forEachIndexed { index, cmd ->
                 println("  ${index + 1}: $cmd")
+            }
+            continue
+        }
+
+        // Export command history
+        if (input.startsWith("export ", ignoreCase = true)) {
+            val filename = input.substring(7).trim()
+            if (filename.isEmpty()) {
+                println("${ANSI_YELLOW}Please specify a filename, e.g., 'export history.txt'${ANSI_RESET}")
+            } else {
+                try {
+                    val exportFile = File(filename)
+                    exportFile.writeText(commandHistory.joinToString(System.lineSeparator()) + System.lineSeparator())
+                    println("${ANSI_GREEN}History exported to ${exportFile.absolutePath}${ANSI_RESET}")
+                } catch (e: Exception) {
+                    println("${ANSI_RED}Failed to export history: ${e.message}${ANSI_RESET}")
+                }
             }
             continue
         }
@@ -196,13 +224,18 @@ fun main(args: Array<String>) = runBlocking {
         }
 
         commandHistory.add(input)
+        try {
+            historyFile.appendText("$input" + System.lineSeparator())
+        } catch (e: Exception) {
+            // Silently ignore history write errors
+        }
 
     // TODO Implement Different answers Like
         //  - "I don't know how to do that"
         //  - "I need Mode Data"
 
 
-        val userMessageText = "$input\nonly give the cmd output and no explanation of what is it doing or what will happen or in code block | just plain text"
+        val userMessageText = "$input" + System.lineSeparator() + "only give the cmd output and no explanation of what is it doing or what will happen or in code block | just plain text"
         promptMessages.add(Message(role = "user", content = userMessageText))
 
         val req = ChatRequest(
@@ -229,8 +262,8 @@ fun main(args: Array<String>) = runBlocking {
             // TODO Optimize this checking of the command
             // Clean up markdown code blocks if the AI includes them
             textOutput = textOutput
-                .replace(Regex("^```[a-zA-Z]*\\n", RegexOption.MULTILINE), "")
-                .replace(Regex("\\n```$", RegexOption.MULTILINE), "")
+                .replace(Regex("^```[a-zA-Z]*\\r?\\n", RegexOption.MULTILINE), "")
+                .replace(Regex("\\r?\\n```$", RegexOption.MULTILINE), "")
                 .replace(Regex("^```$", RegexOption.MULTILINE), "")
                 .trim()
 
@@ -271,7 +304,7 @@ fun main(args: Array<String>) = runBlocking {
             var line: String?
             while (reader.readLine().also { line = it } != null) {
                 println("${ANSI_WHITE}$line${ANSI_RESET}")
-                outputBuilder.append(line).append("\n")
+                outputBuilder.append(line).append(System.lineSeparator())
             }
 
             process.waitFor()
@@ -279,10 +312,10 @@ fun main(args: Array<String>) = runBlocking {
             // Add Assistant response to the history so model has context
             promptMessages.add(Message(role = "assistant", content = textOutput))
 
-            promptMessages.add(Message(role = "user", content = "Command Output:\n${outputBuilder.toString()}"))
+            promptMessages.add(Message(role = "user", content = "Command Output:" + System.lineSeparator() + outputBuilder.toString()))
 
         } catch (e: Exception) {
-            println("${ANSI_RED}Synchronous execution error: ${e.message}\n${ANSI_RESET}")
+            println("${ANSI_RED}Synchronous execution error: ${e.message}" + System.lineSeparator() + ANSI_RESET)
             promptMessages.removeLast() // rollback on error
         }
     }
